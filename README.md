@@ -29,8 +29,8 @@ Wiki RAG App es una aplicación interactiva desarrollada con Streamlit que permi
  ### Clonar repositorio
 
 ```bash
- git clone https://github.com/tuusuario/wiki-rag-app.git  
- cd wiki-rag-app
+ git clone https://github.com/crcordova/wiki-rag 
+ cd wiki-rag
 ```
  ### Instalar dependencias
 
