@@ -3,8 +3,8 @@ import streamlit as st
 from dotenv import load_dotenv
 import shutil
 
-from llama_index.llms.openai import OpenAI
 from llama_index.llms.groq import Groq
+from llama_index.llms.openai import OpenAI
 from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.readers.wikipedia import WikipediaReader
@@ -17,7 +17,7 @@ load_dotenv()
 INDEX_DIR = "wiki_rag"
 
 groq_api_key = os.getenv("GROQ_API_KEY")
-
+Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
 
 @st.cache_resource
 def get_index():
@@ -28,8 +28,8 @@ def get_index():
     docs = WikipediaReader().load_data(pages=PAGES, auto_suggest=False)
     Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
     # Settings.llm = Ollama(model="llama3.2:latest", temperature=0)
-    Settings.llm = Groq(model="llama3-8b-8192", temperature=0, api_key=groq_api_key)
     # Settings.llm = OpenAI(model="gpt-3.5-turbo", temperature=0)
+    Settings.llm = Groq(model="llama3-8b-8192", temperature=0, api_key=groq_api_key)
     index = VectorStoreIndex.from_documents(docs)
     index.storage_context.persist(persist_dir=INDEX_DIR)
 
@@ -41,6 +41,7 @@ def get_query_engine():
 
     # llm = Ollama(model="llama3.2:latest", temperature=0)
     # llm = OpenAI(model="gpt-3.5-turbo", temperature=0)
+    Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
     llm = Groq(model="llama3-8b-8192", temperature=0,api_key=groq_api_key)
     Settings.llm = Groq(model="llama3-8b-8192", temperature=0, api_key=groq_api_key)
     return index.as_query_engine(llm=llm, similarity_top_k = 3)
@@ -62,8 +63,7 @@ def main():
         st.cache_resource.clear()
         index = create_index()
         st.success("Índice actualizado con éxito.")
-    # else:
-    #     index = get_index()
+
 
     question = st.text_input("Ask Question")
     if st.button("Submit") and question:

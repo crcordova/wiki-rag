@@ -10,5 +10,6 @@ PAGES = [
     "Zinc_oxide",
     "Chemical_industry",
     "BASF",
-    "Dow_Chemical_Company"
+    "Dow_Chemical_Company",
+    "Chemical_reaction"
 ]
