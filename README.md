@@ -49,7 +49,7 @@ cp .env.example .env
 
 ### Ejecuta la aplicación
 ```bash
- streamlit run app.py
+ streamlit run main.py
 ```
 
 Para cambiar las páginas indexadas, modifica el archivo `pages.py`:
