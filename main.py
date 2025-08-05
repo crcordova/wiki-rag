@@ -1,84 +1,64 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from utils import load_pages, add_page, delete_page, rebuild_index, load_query_engine
 import os
-import streamlit as st
 from dotenv import load_dotenv
-import shutil
-
-from llama_index.llms.groq import Groq
-from llama_index.llms.openai import OpenAI
-from llama_index.llms.ollama import Ollama
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.readers.wikipedia import WikipediaReader
-from llama_index.core import VectorStoreIndex, StorageContext, Settings, load_index_from_storage
-
-from pages import PAGES
 
 load_dotenv()
 
-INDEX_DIR = "wiki_rag"
+app = FastAPI(title="Agente WIki", version="1.0.0")
 
-groq_api_key = os.getenv("GROQ_API_KEY")
-Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
+origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
 
-@st.cache_resource
-def get_index():
-    if os.path.isdir(INDEX_DIR):
-        storage = StorageContext.from_defaults(persist_dir=INDEX_DIR)
-        return load_index_from_storage(storage)
-    
-    docs = WikipediaReader().load_data(pages=PAGES, auto_suggest=False)
-    Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
-    # Settings.llm = Ollama(model="llama3.2:latest", temperature=0)
-    # Settings.llm = OpenAI(model="gpt-3.5-turbo", temperature=0)
-    Settings.llm = Groq(model="llama3-8b-8192", temperature=0, api_key=groq_api_key)
-    index = VectorStoreIndex.from_documents(docs)
-    index.storage_context.persist(persist_dir=INDEX_DIR)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # permite frontend
+    allow_credentials=True,
+    allow_methods=["*"],     # permite todos los métodos, incluido OPTIONS
+    allow_headers=["*"],
+)
 
-    return index
+class PageRequest(BaseModel):
+    page: str
 
-@st.cache_resource
-def get_query_engine():
-    index = get_index()
+class QuestionRequest(BaseModel):
+    question: str
 
-    # llm = Ollama(model="llama3.2:latest", temperature=0)
-    # llm = OpenAI(model="gpt-3.5-turbo", temperature=0)
-    Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
-    llm = Groq(model="llama3-8b-8192", temperature=0,api_key=groq_api_key)
-    Settings.llm = Groq(model="llama3-8b-8192", temperature=0, api_key=groq_api_key)
-    return index.as_query_engine(llm=llm, similarity_top_k = 3)
+@app.get("/pages")
+def get_pages():
+    return {"pages": load_pages()}
 
-def create_index():
-    docs = WikipediaReader().load_data(pages=PAGES, auto_suggest=False)
-    Settings.embed_model = HuggingFaceEmbedding(model_name="hkunlp/instructor-large")
-    Settings.llm = Groq(model="llama3-8b-8192", temperature=0, api_key=groq_api_key)
-    index = VectorStoreIndex.from_documents(docs)
-    index.storage_context.persist(persist_dir=INDEX_DIR)
-    return index
+@app.post("/pages")
+def add_new_page(req: PageRequest):
+    success = add_page(req.page)
+    if not success:
+        raise HTTPException(status_code=400, detail="Page already exists.")
+    return {"message": f"Page '{req.page}' added and index updated."}
 
-def main():
-    st.title("Wiki RAG App")
+@app.delete("/pages")
+def remove_page(req: PageRequest):
+    success = delete_page(req.page)
+    if not success:
+        raise HTTPException(status_code=404, detail="Page not found.")
+    return {"message": f"Page '{req.page}' removed and index updated."}
 
-    if st.button("Actualizar índice"):
-        if os.path.exists(INDEX_DIR):
-            shutil.rmtree(INDEX_DIR)
-        st.cache_resource.clear()
-        index = create_index()
-        st.success("Índice actualizado con éxito.")
+@app.post("/rebuild-index")
+def rebuild():
+    rebuild_index()
+    return {"message": "Index rebuilt from existing pages."}
 
-
-    question = st.text_input("Ask Question")
-    if st.button("Submit") and question:
-        with st.spinner("Thinking..."):
-            qa = get_query_engine()
-            response = qa.query(question)
-
-        st.subheader("Answer")
-        st.write(response.response)
-
-        st.subheader("Retrevid context")
-
-        for src in response.source_nodes:
-            st.markdown(src.node.get_content())
+@app.post("/ask")
+def ask_question(req: QuestionRequest):
+    query_engine = load_query_engine()
+    response = query_engine.query(req.question)
+    return {
+        "response": response.response,
+        "sources": [src.node.get_content() for src in response.source_nodes]
+    }
 
 
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

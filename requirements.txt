@@ -1,5 +1,5 @@
 llama-index == 0.12.40
-streamlit
+fastapi
 instructor
 openai
 pydantic
@@ -19,3 +19,4 @@ llama-index-llms-groq
 llama-index-readers-file
 llama-index-readers-wikipedia
 wikipedia
+uvicorn
